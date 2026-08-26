@@ -3,7 +3,8 @@ const path = require("path");
 
 const PLACE_ID = "2753915549";
 const DB_FILE = path.join(__dirname, "data", "servers.json");
-
+const API_URL = process.env.API_URL || "https://bf-hop-api.onrender.com";
+const API_KEY = process.env.API_KEY || "hoang_lodanhmatem";
 const NORMAL_INTERVAL = 60 * 1000;
 const TTL_MS = 5 * 60 * 1000;
 
@@ -113,7 +114,30 @@ async function fetchPage(cursor = "") {
 
     throw new Error("Maximum retries exceeded");
 }
+async function reportServers(servers) {
+    const response = await fetch(
+        `${API_URL}/api/servers/report`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${API_KEY}`
+            },
+            body: JSON.stringify({
+                servers
+            })
+        }
+    );
 
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(
+            `Render API HTTP ${response.status}: ${text}`
+        );
+    }
+
+    return response.json();
+}
 async function scan() {
     console.log(
         `[${new Date().toISOString()}] Scanning...`
