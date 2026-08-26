@@ -186,3 +186,108 @@ app.post("/api/servers/report", auth, (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Blox Fruits Hop API running on port ${PORT}`);
 });
+app.get("/api/boss/next", auth, (req, res) => {
+    const bossName = String(req.query.boss || "").trim();
+
+    if (!bossName) {
+        return res.status(400).json({
+            error: "boss parameter is required"
+        });
+    }
+
+    const servers = cleanup();
+
+    const matches = servers.filter(server =>
+        Array.isArray(server.bosses) &&
+        server.bosses.some(
+            boss => String(boss.name).toLowerCase() === bossName.toLowerCase()
+        )
+    );
+
+    if (!matches.length) {
+        return res.status(404).json({
+            error: "No server found for this boss"
+        });
+    }
+
+    const server =
+        matches[Math.floor(Math.random() * matches.length)];
+
+    res.json({
+        success: true,
+        boss: bossName,
+        server
+    });
+});
+
+app.post("/api/boss/report", auth, (req, res) => {
+    const {
+        jobId,
+        boss,
+        playing,
+        maxPlayers,
+        region
+    } = req.body;
+
+    if (!jobId || !boss) {
+        return res.status(400).json({
+            error: "jobId and boss are required"
+        });
+    }
+
+    const servers = cleanup();
+    const now = Date.now();
+
+    let server = servers.find(
+        item => item.jobId === String(jobId)
+    );
+
+    if (!server) {
+        server = {
+            jobId: String(jobId),
+            playing: Number(playing) || 0,
+            maxPlayers: Number(maxPlayers) || 0,
+            region: region || null,
+            updatedAt: now,
+            lastSeen: now,
+            bosses: []
+        };
+
+        servers.push(server);
+    }
+
+    if (!Array.isArray(server.bosses)) {
+        server.bosses = [];
+    }
+
+    const bossName = String(boss.name || boss).trim();
+
+    const existingBoss = server.bosses.find(
+        item => item.name.toLowerCase() === bossName.toLowerCase()
+    );
+
+    const bossData = {
+        name: bossName,
+        detectedAt: existingBoss?.detectedAt || now,
+        lastSeen: now
+    };
+
+    if (existingBoss) {
+        Object.assign(existingBoss, bossData);
+    } else {
+        server.bosses.push(bossData);
+    }
+
+    server.playing = Number(playing) || server.playing;
+    server.maxPlayers = Number(maxPlayers) || server.maxPlayers;
+    server.region = region || server.region;
+    server.updatedAt = now;
+    server.lastSeen = now;
+
+    saveServers(servers);
+
+    res.json({
+        success: true,
+        server
+    });
+});
